@@ -2,10 +2,17 @@
 
 import logging
 import re
+from urllib.request import Request, urlopen
 
 import trafilatura
 
 logger = logging.getLogger(__name__)
+
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 
 # URLs that aren't articles worth summarizing
 SKIP_PATTERNS = [
@@ -45,7 +52,20 @@ def fetch_article(url: str) -> str | None:
     Returns the article text, or None if extraction fails.
     """
     try:
+        # First try trafilatura's built-in fetcher
         downloaded = trafilatura.fetch_url(url)
+
+        # Fallback: fetch with a browser-like User-Agent for sites that block bots
+        if not downloaded:
+            logger.info("Retrying with browser User-Agent: %s", url)
+            try:
+                req = Request(url, headers={"User-Agent": USER_AGENT})
+                with urlopen(req, timeout=15) as resp:
+                    downloaded = resp.read().decode(resp.headers.get_content_charset() or "utf-8")
+            except Exception:
+                logger.warning("Fallback fetch also failed: %s", url)
+                return None
+
         if not downloaded:
             logger.warning("Failed to download: %s", url)
             return None

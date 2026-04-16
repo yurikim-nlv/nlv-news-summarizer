@@ -26,13 +26,14 @@ The bot uses **Socket Mode**, which means it connects outbound to Slack via WebS
 
 #### Enable Socket Mode
 
-3. Go to **Settings > Basic Information > App-Level Tokens**
-4. Click **Generate Token and Scopes**, name it `socket-token`, and add the scope `connections:write`
-5. Copy the token (starts with `xapp-`) — this is your `SLACK_APP_TOKEN`
+3. Go to **Settings > Socket Mode** (left sidebar) and toggle **Enable Socket Mode** on
+4. Go to **Settings > Basic Information > App-Level Tokens**
+5. Click **Generate Token and Scopes**, name it `socket-token`, and add the scope `connections:write`
+6. Copy the token (starts with `xapp-`) — this is your `SLACK_APP_TOKEN`
 
 #### Set Bot Permissions
 
-6. Go to **Features > OAuth & Permissions > Scopes > Bot Token Scopes** and add:
+7. Go to **Features > OAuth & Permissions > Scopes > Bot Token Scopes** and add:
    - `channels:history` — read messages in public channels
    - `channels:read` — view basic channel info
    - `chat:write` — post messages
@@ -40,12 +41,14 @@ The bot uses **Socket Mode**, which means it connects outbound to Slack via WebS
 
 #### Enable Events
 
-7. Go to **Features > Event Subscriptions** and toggle **Enable Events** on
-8. Under **Subscribe to bot events**, add:
+> **Important:** Socket Mode must be enabled (step 3) *before* this step, otherwise Slack will require a Request URL and won't let you save.
+
+8. Go to **Features > Event Subscriptions** and toggle **Enable Events** on
+9. Under **Subscribe to bot events**, add:
    - `message.channels` — listens for messages in public channels
    - `message.groups` — (optional) listens in private channels
    - `app_mention` — responds when @mentioned
-9. Click **Save Changes**
+10. Click **Save Changes**
 
 #### Install the App
 
@@ -121,7 +124,7 @@ Railway auto-deploys on every push to `main`. Check the **Logs** tab to confirm 
 | `SLACK_BOT_TOKEN` | Yes | — | Bot user OAuth token (`xoxb-...`) |
 | `SLACK_APP_TOKEN` | Yes | — | App-level token (`xapp-...`) |
 | `ANTHROPIC_API_KEY` | Yes | — | Anthropic API key |
-| `SUMMARY_MODEL` | No | `claude-sonnet-4-20250514` | Claude model to use for summaries |
+| `SUMMARY_MODEL` | No | `claude-sonnet-4-6` | Claude model to use for summaries |
 | `SUMMARY_MAX_TOKENS` | No | `1024` | Max tokens for summary response |
 
 ## Project Structure

@@ -22,12 +22,16 @@ app = App(token=SLACK_BOT_TOKEN)
 @app.event("message")
 def handle_message(event, say):
     """Process new messages, look for URLs, summarize articles."""
+    logger.info("Received message event: %s", event)
+
     # Ignore bot messages, edits, and thread replies
     if event.get("bot_id") or event.get("subtype"):
+        logger.info("Skipping: bot_id=%s subtype=%s", event.get("bot_id"), event.get("subtype"))
         return
 
     text = event.get("text", "")
     urls = extract_urls(text)
+    logger.info("Extracted URLs: %s", urls)
 
     if not urls:
         return
@@ -41,11 +45,21 @@ def handle_message(event, say):
         article_text = fetch_article(url)
         if not article_text:
             logger.info("Could not extract article from: %s", url)
+            say(
+                text=f"_Couldn't summarize this link — the site blocked access or didn't return readable article content._\n{url}",
+                channel=channel,
+                thread_ts=thread_ts,
+            )
             continue
 
         summary = summarize(article_text, url)
         if not summary:
             logger.info("Could not summarize: %s", url)
+            say(
+                text=f"_Fetched the article but the summarization failed — this can happen if the content is too short or in an unexpected format._\n{url}",
+                channel=channel,
+                thread_ts=thread_ts,
+            )
             continue
 
         say(
