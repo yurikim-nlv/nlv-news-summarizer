@@ -14,6 +14,20 @@ USER_AGENT = (
     "Chrome/131.0.0.0 Safari/537.36"
 )
 
+BROWSER_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "identity",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
 # URLs that aren't articles worth summarizing
 SKIP_PATTERNS = [
     r"^https?://(www\.)?(youtube\.com|youtu\.be)/",
@@ -55,11 +69,11 @@ def fetch_article(url: str) -> str | None:
         # First try trafilatura's built-in fetcher
         downloaded = trafilatura.fetch_url(url)
 
-        # Fallback: fetch with a browser-like User-Agent for sites that block bots
+        # Fallback: fetch with full browser-like headers for sites that block bots
         if not downloaded:
-            logger.info("Retrying with browser User-Agent: %s", url)
+            logger.info("Retrying with browser headers: %s", url)
             try:
-                req = Request(url, headers={"User-Agent": USER_AGENT})
+                req = Request(url, headers=BROWSER_HEADERS)
                 with urlopen(req, timeout=15) as resp:
                     downloaded = resp.read().decode(resp.headers.get_content_charset() or "utf-8")
             except Exception:

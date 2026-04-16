@@ -101,9 +101,9 @@ You should see `Starting News Summarizer Bot...` in the console. Post a news lin
 ### First-time setup
 
 1. Create an account at [railway.app](https://railway.app)
-2. Click **New Project** > **Deploy from GitHub Repo**
-3. Connect your GitHub account and select this repository
-4. Railway will auto-detect the Dockerfile and deploy
+2. Install the [Railway GitHub App](https://github.com/apps/railway-app) on your GitHub account — grant it access to this repository (or all repositories)
+3. Back in Railway, click **New Project** > **Deploy from GitHub Repo**
+4. Select this repository — Railway will auto-detect the Dockerfile and deploy
 
 ### Set environment variables
 
@@ -160,10 +160,27 @@ The bot will attempt to summarize any HTTP/HTTPS link that looks like a news art
 - Check that `message.channels` is enabled under Event Subscriptions
 - Look at the Railway logs for errors
 
-**"Could not extract article" in logs:**
-- Some sites block automated requests or are heavily JavaScript-rendered
-- Paywalled articles may not return useful text
-- This is expected for a subset of links — the bot silently skips them
+**"Couldn't summarize this link" reply in Slack:**
+- Some sites block automated requests. The bot will reply in-thread explaining whether the fetch or summarization step failed.
+- If a site consistently blocks requests, the article fetcher in `bot/article.py` may need tweaking (see below).
 
 **Bot responds to its own messages (loop):**
 - This shouldn't happen — the bot filters out messages with `bot_id`. If it does, check that the Slack app has a proper bot user configured.
+
+## Article Fetching — What We've Tweaked
+
+Not every site makes it easy to grab article text. The fetcher (`bot/article.py`) has been iteratively improved to handle real-world sites. Here's what's in place and why:
+
+| Layer | What it does | Why it was added |
+|-------|-------------|-----------------|
+| **trafilatura (default)** | Downloads and extracts article text using its built-in fetcher | Works out of the box for most sites |
+| **Browser-like headers (fallback)** | Retries with a full set of headers (`User-Agent`, `Sec-Fetch-*`, `Accept`, etc.) mimicking a real Chrome browser | Added after sites like motor1.com returned 403 errors — they check for bot-like request headers |
+| **Skip patterns** | Ignores URLs that aren't articles (YouTube, Twitter/X, images, Slack links, Giphy) | Prevents unnecessary fetch attempts on non-article content |
+
+### If a new site isn't working
+
+1. Run the bot locally and check the logs — they'll show whether the download failed (403/timeout) or the extraction returned too little text
+2. Common fixes:
+   - **403 errors**: The site may need additional headers or cookie handling. Update `BROWSER_HEADERS` in `bot/article.py`
+   - **Empty extraction**: trafilatura's parser may not understand the site's HTML structure. Try adjusting the `trafilatura.extract()` options (e.g., `favor_recall=True` instead of `favor_precision=True`)
+   - **JavaScript-rendered sites**: Sites that load content via JavaScript won't work with any HTTP-based fetcher. These would require a headless browser (e.g., Playwright), which is a heavier dependency
