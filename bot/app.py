@@ -1,0 +1,77 @@
+"""Slack bot that listens for links and replies with article summaries."""
+
+import logging
+import re
+
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
+
+from bot.article import extract_urls, fetch_article
+from bot.config import SLACK_APP_TOKEN, SLACK_BOT_TOKEN
+from bot.summarizer import summarize
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+app = App(token=SLACK_BOT_TOKEN)
+
+
+@app.event("message")
+def handle_message(event, say):
+    """Process new messages, look for URLs, summarize articles."""
+    # Ignore bot messages, edits, and thread replies
+    if event.get("bot_id") or event.get("subtype"):
+        return
+
+    text = event.get("text", "")
+    urls = extract_urls(text)
+
+    if not urls:
+        return
+
+    channel = event["channel"]
+    thread_ts = event["ts"]  # Reply in thread to the original message
+
+    for url in urls:
+        logger.info("Processing URL: %s", url)
+
+        article_text = fetch_article(url)
+        if not article_text:
+            logger.info("Could not extract article from: %s", url)
+            continue
+
+        summary = summarize(article_text, url)
+        if not summary:
+            logger.info("Could not summarize: %s", url)
+            continue
+
+        say(
+            text=summary,
+            channel=channel,
+            thread_ts=thread_ts,
+        )
+        logger.info("Posted summary for: %s", url)
+
+
+@app.event("app_mention")
+def handle_mention(event, say):
+    """Respond when someone @mentions the bot."""
+    say(
+        text="👋 I automatically summarize news articles posted in this channel. "
+        "Just drop a link and I'll reply with a summary!",
+        channel=event["channel"],
+        thread_ts=event.get("ts"),
+    )
+
+
+def main():
+    logger.info("Starting News Summarizer Bot...")
+    handler = SocketModeHandler(app, SLACK_APP_TOKEN)
+    handler.start()
+
+
+if __name__ == "__main__":
+    main()

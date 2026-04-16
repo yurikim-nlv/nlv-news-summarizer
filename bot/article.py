@@ -1,0 +1,68 @@
+"""Fetch and extract article text from URLs."""
+
+import logging
+import re
+
+import trafilatura
+
+logger = logging.getLogger(__name__)
+
+# URLs that aren't articles worth summarizing
+SKIP_PATTERNS = [
+    r"^https?://(www\.)?(youtube\.com|youtu\.be)/",
+    r"^https?://(www\.)?twitter\.com/",
+    r"^https?://(www\.)?x\.com/",
+    r"^https?://(.*\.)?slack\.com/",
+    r"^https?://(.*\.)?giphy\.com/",
+    r"\.(png|jpg|jpeg|gif|mp4|mp3|pdf)(\?.*)?$",
+]
+
+
+def should_skip(url: str) -> bool:
+    """Return True if the URL is not an article we should summarize."""
+    return any(re.search(p, url, re.IGNORECASE) for p in SKIP_PATTERNS)
+
+
+def extract_urls(text: str) -> list[str]:
+    """Pull URLs out of a Slack message.
+
+    Slack wraps URLs in angle brackets: <https://example.com>
+    Sometimes with a label: <https://example.com|example.com>
+    """
+    # Match Slack-formatted URLs
+    slack_urls = re.findall(r"<(https?://[^|>]+)(?:\|[^>]*)?>", text)
+    if slack_urls:
+        return [u for u in slack_urls if not should_skip(u)]
+
+    # Fallback: bare URLs
+    bare_urls = re.findall(r"https?://\S+", text)
+    return [u for u in bare_urls if not should_skip(u)]
+
+
+def fetch_article(url: str) -> str | None:
+    """Download and extract the main text content from a URL.
+
+    Returns the article text, or None if extraction fails.
+    """
+    try:
+        downloaded = trafilatura.fetch_url(url)
+        if not downloaded:
+            logger.warning("Failed to download: %s", url)
+            return None
+
+        text = trafilatura.extract(
+            downloaded,
+            include_comments=False,
+            include_tables=False,
+            favor_precision=True,
+        )
+
+        if not text or len(text.strip()) < 100:
+            logger.warning("Extracted text too short from: %s", url)
+            return None
+
+        return text.strip()
+
+    except Exception:
+        logger.exception("Error fetching article: %s", url)
+        return None
