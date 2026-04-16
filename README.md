@@ -177,6 +177,12 @@ Not every site makes it easy to grab article text. The fetcher (`bot/article.py`
 | **Browser-like headers (fallback)** | Retries with a full set of headers (`User-Agent`, `Sec-Fetch-*`, `Accept`, etc.) mimicking a real Chrome browser | Added after sites like motor1.com returned 403 errors — they check for bot-like request headers |
 | **Skip patterns** | Ignores URLs that aren't articles (YouTube, Twitter/X, images, Slack links, Giphy) | Prevents unnecessary fetch attempts on non-article content |
 
+### Known limitation: paywalled sites on cloud hosting
+
+Some major news sites (NYTimes, Washington Post, etc.) block requests from cloud server IP addresses. Articles from these sites will work when running the bot locally (residential IP) but **fail when deployed to Railway or similar platforms**.
+
+To fix this, you'd need to route requests through a residential proxy service such as [ScraperAPI](https://www.scraperapi.com/), [Bright Data](https://brightdata.com/), or [ScrapingBee](https://www.scrapingbee.com/). These add a small per-request cost but make cloud-hosted fetching indistinguishable from a normal browser.
+
 ### If a new site isn't working
 
 1. Run the bot locally and check the logs — they'll show whether the download failed (403/timeout) or the extraction returned too little text
