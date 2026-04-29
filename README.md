@@ -135,6 +135,7 @@ Railway auto-deploys on every push to `main`. Check the **Logs** tab to confirm 
 │   ├── app.py           # Slack event handlers and bot startup
 │   ├── article.py       # URL extraction and article text fetching
 │   ├── config.py        # Environment variable loading
+│   ├── gdrive.py        # Google Drive / Docs file fetching and extraction
 │   └── summarizer.py    # Claude-powered article summarization
 ├── .env.example         # Template for environment variables
 ├── Dockerfile           # Container build for deployment
@@ -203,3 +204,16 @@ To fix this, you'd need to route requests through a residential proxy service su
    - **403 errors**: The site may need additional headers or cookie handling. Update `BROWSER_HEADERS` in `bot/article.py`
    - **Empty extraction**: trafilatura's parser may not understand the site's HTML structure. Try adjusting the `trafilatura.extract()` options (e.g., `favor_recall=True` instead of `favor_precision=True`)
    - **JavaScript-rendered sites**: Sites that load content via JavaScript won't work with any HTTP-based fetcher. These would require a headless browser (e.g., Playwright), which is a heavier dependency
+
+## Changelog
+
+### Google Drive & Docs support
+**What changed:** Added `bot/gdrive.py`, a dedicated module for handling Google Drive and Google Docs links. Updated `bot/app.py` to route Drive URLs through this new fetcher instead of the standard article fetcher. Added `pypdf` and `python-docx` as dependencies.
+
+**Why:** The standard article fetcher failed on Drive links because `drive.google.com` serves a JavaScript-rendered file preview page, not readable HTML. Even with browser-like headers, there's no article text to extract. Drive files need to be downloaded directly and parsed based on their file type.
+
+**How it works:**
+- Google Docs/Slides links are exported directly as plain text via Google's own export API (no scraping needed)
+- `drive.google.com/file/d/...` links are downloaded as raw bytes, then the file type is detected from the first few bytes (magic bytes) rather than guessing from the URL
+- PDFs are parsed with `pypdf`, Word docs with `python-docx`
+- If the file isn't publicly shared, the bot replies with a clear error explaining the sharing requirement
