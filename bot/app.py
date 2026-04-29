@@ -8,6 +8,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from bot.article import extract_urls, fetch_article
 from bot.config import SLACK_APP_TOKEN, SLACK_BOT_TOKEN
+from bot.gdrive import fetch_drive_file, is_drive_url
 from bot.summarizer import summarize
 
 logging.basicConfig(
@@ -42,15 +43,27 @@ def handle_message(event, say):
     for url in urls:
         logger.info("Processing URL: %s", url)
 
-        article_text = fetch_article(url)
-        if not article_text:
-            logger.info("Could not extract article from: %s", url)
-            say(
-                text=f"_Couldn't summarize this link — the site blocked access or didn't return readable article content._\n{url}",
-                channel=channel,
-                thread_ts=thread_ts,
-            )
-            continue
+        # Route Google Drive / Docs links through the dedicated fetcher
+        if is_drive_url(url):
+            logger.info("Detected Google Drive/Docs URL, using Drive fetcher")
+            article_text = fetch_drive_file(url)
+            if not article_text:
+                say(
+                    text="_Couldn't read this Google Drive file — make sure it's shared publicly (Anyone with the link). Supported formats: Google Docs, PDFs, and Word documents._",
+                    channel=channel,
+                    thread_ts=thread_ts,
+                )
+                continue
+        else:
+            article_text = fetch_article(url)
+            if not article_text:
+                logger.info("Could not extract article from: %s", url)
+                say(
+                    text=f"_Couldn't summarize this link — the site blocked access or didn't return readable article content._\n{url}",
+                    channel=channel,
+                    thread_ts=thread_ts,
+                )
+                continue
 
         summary = summarize(article_text, url)
         if not summary:

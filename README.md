@@ -153,6 +153,19 @@ The bot will attempt to summarize any HTTP/HTTPS link that looks like a news art
 - Slack internal links
 - Giphy links
 
+### Google Drive support
+
+The bot has special handling for Google Drive and Google Docs links. Supported formats:
+
+| Link type | Example | Notes |
+|-----------|---------|-------|
+| Google Docs | `docs.google.com/document/d/...` | Exported as plain text |
+| Google Slides | `docs.google.com/presentation/d/...` | Exported as plain text |
+| PDF on Drive | `drive.google.com/file/d/...` | Text extracted with pypdf |
+| Word doc on Drive | `drive.google.com/file/d/...` | Text extracted with python-docx |
+
+> **Requirement:** The file must be shared as **"Anyone with the link can view"**. Private files will return an error. Authentication is not supported.
+
 ## Troubleshooting
 
 **Bot doesn't respond to links:**
