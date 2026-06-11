@@ -11,6 +11,11 @@ A Slack bot that monitors a channel for posted links, fetches the article conten
 
 The bot uses **Socket Mode**, which means it connects outbound to Slack via WebSocket — no public URL or ingress needed. This makes deployment simple on any platform.
 
+### What the bot does and doesn't summarize
+
+- **Top-level messages only.** The bot only summarizes links posted as new top-level messages in the channel. Links added in a thread reply (e.g. when people discuss the original post and drop additional links) are ignored, so the bot doesn't summarize tangential links from the back-and-forth.
+- **One summary per unique link.** If the same link appears more than once in a single message — for example, a hyperlinked label *and* the raw URL pasted alongside it — the bot summarizes it only once. Duplicate detection ignores trailing slashes and tracking parameters (`utm_*`, `fbclid`, `gclid`), so `example.com/a` and `example.com/a/?utm_source=slack` count as the same article.
+
 ## Prerequisites
 
 - Python 3.11+
@@ -206,6 +211,19 @@ To fix this, you'd need to route requests through a residential proxy service su
    - **JavaScript-rendered sites**: Sites that load content via JavaScript won't work with any HTTP-based fetcher. These would require a headless browser (e.g., Playwright), which is a heavier dependency
 
 ## Changelog
+
+### Top-level-only summaries & duplicate-link dedup
+**What changed:** Two behavior changes to reduce noise:
+1. The bot now ignores links posted in thread replies and only summarizes links in top-level channel messages.
+2. When a single message contains the same link more than once, the bot summarizes it only once instead of repeating the TL;DR.
+
+**Why:**
+- **Thread replies:** Once the bot replies in-thread, people often continue the conversation there and paste additional/related links. Those weren't the "news drop" the channel is for, so summarizing them cluttered the thread. Limiting to top-level posts keeps summaries tied to the intentional share.
+- **Duplicate links:** Users frequently paste a hyperlinked title *and* the bare URL of the same article (common when copying from a browser or another app). The bot previously treated these as two links and posted the same summary twice.
+
+**How it works:**
+- **Top-level filter (`bot/app.py`):** Slack tags thread replies with a `thread_ts` that differs from the message's own `ts`. The handler now early-returns when `thread_ts` is present and `!= ts`. The bot's own in-thread replies were already filtered out by `bot_id`, so this cleanly targets human replies only.
+- **Dedup (`bot/article.py`):** `extract_urls` now runs its results through an order-preserving dedup. URLs are compared using a normalized key — lowercased scheme/host, trailing slash stripped, and tracking params (`utm_*`, `fbclid`, `gclid`) removed — but the original URL form is what gets fetched. This catches both exact copy-paste duplicates and the "same article, slightly different URL" case.
 
 ### Google Drive & Docs support
 **What changed:** Added `bot/gdrive.py`, a dedicated module for handling Google Drive and Google Docs links. Updated `bot/app.py` to route Drive URLs through this new fetcher instead of the standard article fetcher. Added `pypdf` and `python-docx` as dependencies.

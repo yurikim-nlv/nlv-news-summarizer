@@ -2,6 +2,7 @@
 
 import logging
 import re
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 import trafilatura
@@ -44,6 +45,42 @@ def should_skip(url: str) -> bool:
     return any(re.search(p, url, re.IGNORECASE) for p in SKIP_PATTERNS)
 
 
+def _normalize_url(url: str) -> str:
+    """Produce a comparison key so near-identical URLs dedup to one.
+
+    Lowercases the scheme/host, drops a trailing slash on the path, and strips
+    common tracking params (utm_*, fbclid, gclid). The returned value is only
+    used for equality checks, not for fetching.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return url
+
+    netloc = parsed.netloc.lower()
+    path = parsed.path.rstrip("/")
+    query = urlencode(
+        [
+            (k, v)
+            for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+            if not (k.lower().startswith("utm_") or k.lower() in ("fbclid", "gclid"))
+        ]
+    )
+    return urlunparse((parsed.scheme.lower(), netloc, path, parsed.params, query, ""))
+
+
+def _dedup(urls: list[str]) -> list[str]:
+    """Drop duplicate URLs, preserving first-seen order."""
+    seen = set()
+    result = []
+    for url in urls:
+        key = _normalize_url(url)
+        if key not in seen:
+            seen.add(key)
+            result.append(url)
+    return result
+
+
 def extract_urls(text: str) -> list[str]:
     """Pull URLs out of a Slack message.
 
@@ -53,11 +90,11 @@ def extract_urls(text: str) -> list[str]:
     # Match Slack-formatted URLs
     slack_urls = re.findall(r"<(https?://[^|>]+)(?:\|[^>]*)?>", text)
     if slack_urls:
-        return [u for u in slack_urls if not should_skip(u)]
+        return _dedup([u for u in slack_urls if not should_skip(u)])
 
     # Fallback: bare URLs
     bare_urls = re.findall(r"https?://\S+", text)
-    return [u for u in bare_urls if not should_skip(u)]
+    return _dedup([u for u in bare_urls if not should_skip(u)])
 
 
 def fetch_article(url: str) -> str | None:

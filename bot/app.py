@@ -25,9 +25,16 @@ def handle_message(event, say):
     """Process new messages, look for URLs, summarize articles."""
     logger.info("Received message event: %s", event)
 
-    # Ignore bot messages, edits, and thread replies
+    # Ignore bot messages and edits
     if event.get("bot_id") or event.get("subtype"):
         logger.info("Skipping: bot_id=%s subtype=%s", event.get("bot_id"), event.get("subtype"))
+        return
+
+    # Only summarize top-level posts, not replies inside a thread. Thread replies
+    # carry a thread_ts that differs from the message's own ts.
+    thread_ts_field = event.get("thread_ts")
+    if thread_ts_field and thread_ts_field != event.get("ts"):
+        logger.info("Skipping thread reply: thread_ts=%s ts=%s", thread_ts_field, event.get("ts"))
         return
 
     text = event.get("text", "")
